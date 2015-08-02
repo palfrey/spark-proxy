@@ -89,7 +89,7 @@ class ConnectionHandler:
         self.ser.write("c %s %d\n"% (host, port))
         response = self.ser.readline().strip()
         if response != "Connected to '%s' and '%s'"%(host, port):
-            print "Tried to connect to %s:%s"%(host,port)
+            print "Tried to connect to %s %s"%(host,port)
             raise Exception, response
 
     def _read_write(self):
@@ -114,12 +114,15 @@ class ConnectionHandler:
             if count == time_out_max:
                 break
 
-def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
-                  handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
-    ser = ExtendedSerialPort(serial_port, 115200, timeout=1)
+def do_break(ser):
     ser.write("\x1Bstop")
     time.sleep(0.3) # let the Spark catchup
     ser.read(1000) # skip all the errors from the break command
+
+def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
+                  handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
+    ser = ExtendedSerialPort(serial_port, 115200, timeout=1)
+    do_break(ser)
     ser.write("i")
     line = ser.readline()
     if line != "Ready\r\n":
@@ -133,8 +136,13 @@ def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
     soc.bind((host, port))
     print "Serving on %s:%d"%(host, port)#debug
     soc.listen(0)
-    while 1:
-        thread.start_new_thread(handler, soc.accept()+(timeout,ser))
+    while True:
+        args = soc.accept()+(timeout,ser)
+        try:
+            handler(*args)
+        except Exception, e:
+            print "Exception", e
+            do_break(ser)
 
 if __name__ == '__main__':
     start_server(serial_port = sys.argv[1])
