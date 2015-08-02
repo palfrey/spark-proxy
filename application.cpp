@@ -1,4 +1,5 @@
 #include "application.h"
+#include "tinker.h"
 
 SYSTEM_MODE(AUTOMATIC);
 
@@ -11,6 +12,10 @@ int breakLength = strlen(breakSequence);
 
 void setup() {
     Serial.begin(115200);
+    Spark.function("digitalread", tinkerDigitalRead);
+    Spark.function("digitalwrite", tinkerDigitalWrite);
+    Spark.function("analogread", tinkerAnalogRead);
+    Spark.function("analogwrite", tinkerAnalogWrite);
 }
 
 int readSerial() {
