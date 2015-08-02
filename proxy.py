@@ -115,7 +115,7 @@ class ConnectionHandler:
 
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
                   handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
-    ser = ExtendedSerialPort(serial_port, 9600, timeout=1)
+    ser = ExtendedSerialPort(serial_port, 115200, timeout=1)
     ser.write("i")
     line = ser.readline()
     if line != "Ready\r\n":

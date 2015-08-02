@@ -9,7 +9,7 @@ TCPClient client;
 bool connected = false;
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
 }
 
 const char* readWord() {
@@ -45,11 +45,14 @@ void connect(String host, int port) {
 
 void loop () {
     if (Serial.available()) {
-        int cmd = Serial.read();
         if (connected) {
-            client.write(cmd);
+            int bytes = Serial.available();
+            for (int i=0; i<bytes; i++) {
+                client.write(Serial.read());
+            }
         }
         else {
+            int cmd = Serial.read();
             String host, stringPort;
             switch (cmd) {
                 case 'i':
@@ -70,13 +73,12 @@ void loop () {
         }
     }
     if (connected) {
-        if (client.available())
-        {
-            Serial.print(client.read());
+        int bytes = client.available();
+        for (int i=0; i<bytes; i++) {
+            Serial.write(client.read());
         }
         
-        if (!client.connected())
-        {
+        if (!client.connected()) {
             Serial.println();
             Serial.println("Disconnecting");
             client.stop();
