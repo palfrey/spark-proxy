@@ -24,72 +24,16 @@
 #FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 #OTHER DEALINGS IN THE SOFTWARE.
 
-"""\
-Copyright (c) <2009> <Fábio Domingues - fnds3000 in gmail.com> <MIT Licence>
-
-                  **************************************
-                 *** Python Proxy - A Fast HTTP proxy ***
-                  **************************************
-
-Neste momento este proxy é um Elie Proxy.
-
-Suporta os métodos HTTP:
- - OPTIONS;
- - GET;
- - HEAD;
- - POST;
- - PUT;
- - DELETE;
- - TRACE;
- - CONENCT.
-
-Suporta:
- - Conexões dos cliente em IPv4 ou IPv6;
- - Conexões ao alvo em IPv4 e IPv6;
- - Conexões todo o tipo de transmissão de dados TCP (CONNECT tunneling),
-     p.e. ligações SSL, como é o caso do HTTPS.
-
-A fazer:
- - Verificar se o input vindo do cliente está correcto;
-   - Enviar os devidos HTTP erros se não, ou simplesmente quebrar a ligação;
- - Criar um gestor de erros;
- - Criar ficheiro log de erros;
- - Colocar excepções nos sítios onde é previsível a ocorrência de erros,
-     p.e.sockets e ficheiros;
- - Rever tudo e melhorar a estrutura do programar e colocar nomes adequados nas
-     variáveis e métodos;
- - Comentar o programa decentemente;
- - Doc Strings.
-
-Funcionalidades futuras:
- - Adiconar a funcionalidade de proxy anónimo e transparente;
- - Suportar FTP?.
-
-
-(!) Atenção o que se segue só tem efeito em conexões não CONNECT, para estas o
- proxy é sempre Elite.
-
-Qual a diferença entre um proxy Elite, Anónimo e Transparente?
- - Um proxy elite é totalmente anónimo, o servidor que o recebe não consegue ter
-     conhecimento da existência do proxy e não recebe o endereço IP do cliente;
- - Quando é usado um proxy anónimo o servidor sabe que o cliente está a usar um
-     proxy mas não sabe o endereço IP do cliente;
-     É enviado o cabeçalho HTTP "Proxy-agent".
- - Um proxy transparente fornece ao servidor o IP do cliente e um informação que
-     se está a usar um proxy.
-     São enviados os cabeçalhos HTTP "Proxy-agent" e "HTTP_X_FORWARDED_FOR".
-
-"""
-
-import socket, thread, select
+import socket, thread, select, serial, sys
 
 __version__ = '0.1.0 Draft 1'
 BUFLEN = 8192
-VERSION = 'Python Proxy/'+__version__
+VERSION = 'Spark Proxy/'+__version__
 HTTPVER = 'HTTP/1.1'
 
 class ConnectionHandler:
-    def __init__(self, connection, address, timeout):
+    def __init__(self, connection, address, timeout, ser):
+        self.ser = ser
         self.client = connection
         self.client_buffer = ''
         self.timeout = timeout
@@ -123,7 +67,7 @@ class ConnectionHandler:
     def method_others(self):
         self.path = self.path[7:]
         i = self.path.find('/')
-        host = self.path[:i]        
+        host = self.path[:i]
         path = self.path[i:]
         self._connect_target(host)
         self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+
@@ -138,9 +82,9 @@ class ConnectionHandler:
             host = host[:i]
         else:
             port = 80
-        (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
-        self.target = socket.socket(soc_family)
-        self.target.connect(address)
+        print "Want to connect", host, port
+        self.ser.write("c %s %d\n"% (host, port))
+        print self.ser.readline()
 
     def _read_write(self):
         time_out_max = self.timeout/3
@@ -165,7 +109,12 @@ class ConnectionHandler:
                 break
 
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
-                  handler=ConnectionHandler):
+                  handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
+    ser = serial.Serial(serial_port, 9600, timeout=1)
+    ser.write("i")
+    line = ser.readline()
+    if line != "Ready\r\n":
+        raise Exception, line
     if IPv6==True:
         soc_type=socket.AF_INET6
     else:
@@ -175,7 +124,7 @@ def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
     print "Serving on %s:%d."%(host, port)#debug
     soc.listen(0)
     while 1:
-        thread.start_new_thread(handler, soc.accept()+(timeout,))
+        thread.start_new_thread(handler, soc.accept()+(timeout,ser))
 
 if __name__ == '__main__':
-    start_server()
+    start_server(serial_port = sys.argv[1])
