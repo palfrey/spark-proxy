@@ -2,21 +2,36 @@
 
 SYSTEM_MODE(AUTOMATIC);
 
-/**
-* Declaring the variables.
-*/
 TCPClient client;
 bool connected = false;
 
+const char* breakSequence = "\x1Bstop";
+int breakLocation = 0;
+int breakLength = strlen(breakSequence);
+
 void setup() {
     Serial.begin(115200);
+}
+
+int readSerial() {
+    int chr = Serial.read();
+    if (connected && breakSequence[breakLocation] == chr) {
+        breakLocation ++;
+    }
+    else {
+        breakLocation = 0;
+    }
+    if (connected && breakLocation == breakLength) {
+        client.stop();
+        connected = false;
+    }
 }
 
 const char* readWord() {
     String accumulated = "";
     while (true) {
         if (Serial.available()) {
-            char incoming = Serial.read();
+            char incoming = readSerial();
             if (incoming == '\n' || incoming == ' ') {
                 break;
             }
@@ -48,11 +63,11 @@ void loop () {
         if (connected) {
             int bytes = Serial.available();
             for (int i=0; i<bytes; i++) {
-                client.write(Serial.read());
+                client.write(readSerial());
             }
         }
         else {
-            int cmd = Serial.read();
+            int cmd = readSerial();
             String host, stringPort;
             switch (cmd) {
                 case 'i':

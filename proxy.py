@@ -24,9 +24,9 @@
 #FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 #OTHER DEALINGS IN THE SOFTWARE.
 
-import socket, thread, select, serial, sys
+import socket, thread, select, serial, sys, time
 
-__version__ = '0.1.0 Draft 1'
+__version__ = '0.1'
 BUFLEN = 8192
 VERSION = 'Spark Proxy/'+__version__
 HTTPVER = 'HTTP/1.1'
@@ -89,6 +89,7 @@ class ConnectionHandler:
         self.ser.write("c %s %d\n"% (host, port))
         response = self.ser.readline().strip()
         if response != "Connected to '%s' and '%s'"%(host, port):
+            print "Tried to connect to %s:%s"%(host,port)
             raise Exception, response
 
     def _read_write(self):
@@ -116,6 +117,9 @@ class ConnectionHandler:
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
                   handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
     ser = ExtendedSerialPort(serial_port, 115200, timeout=1)
+    ser.write("\x1Bstop")
+    time.sleep(0.3) # let the Spark catchup
+    ser.read(1000) # skip all the errors from the break command
     ser.write("i")
     line = ser.readline()
     if line != "Ready\r\n":
@@ -125,8 +129,9 @@ def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
     else:
         soc_type=socket.AF_INET
     soc = socket.socket(soc_type)
+    soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     soc.bind((host, port))
-    print "Serving on %s:%d."%(host, port)#debug
+    print "Serving on %s:%d"%(host, port)#debug
     soc.listen(0)
     while 1:
         thread.start_new_thread(handler, soc.accept()+(timeout,ser))
