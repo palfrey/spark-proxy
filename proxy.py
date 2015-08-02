@@ -31,6 +31,10 @@ BUFLEN = 8192
 VERSION = 'Spark Proxy/'+__version__
 HTTPVER = 'HTTP/1.1'
 
+class ExtendedSerialPort(serial.Serial):
+    def recv(self, *args):
+        return self.read(*args)
+
 class ConnectionHandler:
     def __init__(self, connection, address, timeout, ser):
         self.ser = ser
@@ -44,7 +48,7 @@ class ConnectionHandler:
                              'DELETE', 'TRACE'):
             self.method_others()
         self.client.close()
-        self.target.close()
+        #self.target.close()
 
     def get_base_header(self):
         while 1:
@@ -62,7 +66,7 @@ class ConnectionHandler:
         self.client.send(HTTPVER+' 200 Connection established\n'+
                          'Proxy-agent: %s\n\n'%VERSION)
         self.client_buffer = ''
-        self._read_write()        
+        self._read_write()
 
     def method_others(self):
         self.path = self.path[7:]
@@ -70,7 +74,7 @@ class ConnectionHandler:
         host = self.path[:i]
         path = self.path[i:]
         self._connect_target(host)
-        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+
+        self.ser.write('%s %s %s\n'%(self.method, path, self.protocol)+
                          self.client_buffer)
         self.client_buffer = ''
         self._read_write()
@@ -82,13 +86,14 @@ class ConnectionHandler:
             host = host[:i]
         else:
             port = 80
-        print "Want to connect", host, port
         self.ser.write("c %s %d\n"% (host, port))
-        print self.ser.readline()
+        response = self.ser.readline().strip()
+        if response != "Connected to '%s' and '%s'"%(host, port):
+            raise Exception, response
 
     def _read_write(self):
         time_out_max = self.timeout/3
-        socs = [self.client, self.target]
+        socs = [self.client, self.ser]
         count = 0
         while 1:
             count += 1
@@ -99,7 +104,7 @@ class ConnectionHandler:
                 for in_ in recv:
                     data = in_.recv(BUFLEN)
                     if in_ is self.client:
-                        out = self.target
+                        out = self.ser
                     else:
                         out = self.client
                     if data:
@@ -110,7 +115,7 @@ class ConnectionHandler:
 
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
                   handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
-    ser = serial.Serial(serial_port, 9600, timeout=1)
+    ser = ExtendedSerialPort(serial_port, 9600, timeout=1)
     ser.write("i")
     line = ser.readline()
     if line != "Ready\r\n":
