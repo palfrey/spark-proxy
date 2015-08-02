@@ -25,6 +25,7 @@ int readSerial() {
         client.stop();
         connected = false;
     }
+    return chr;
 }
 
 const char* readWord() {
