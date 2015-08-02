@@ -1,22 +1,15 @@
 #include "application.h"
 #include "tinker.h"
 
-SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 TCPClient client;
+bool initialised = false;
 bool connected = false;
 
 const char* breakSequence = "\x1Bstop";
 int breakLocation = 0;
 int breakLength = strlen(breakSequence);
-
-void setup() {
-    Serial.begin(115200);
-    Spark.function("digitalread", tinkerDigitalRead);
-    Spark.function("digitalwrite", tinkerDigitalWrite);
-    Spark.function("analogread", tinkerAnalogRead);
-    Spark.function("analogwrite", tinkerAnalogWrite);
-}
 
 int readSerial() {
     int chr = Serial.read();
@@ -64,7 +57,52 @@ void connect(String host, int port) {
     }
 }
 
+void setup() {
+    Serial.begin(115200);
+    WiFi.on();
+    WiFi.connect();
+}
+
 void loop () {
+    if (!initialised) {
+        if (WiFi.ready()) {
+            connect("www.apple.com", 80);
+            if (connected) {
+                client.println("GET /library/test/success.html HTTP/1.1");
+                client.println("Host: www.apple.com");
+                client.println();
+                const char *success = "Success";
+                int successLocation = 0;
+                while (true) {
+                    if (client.available()) {
+                        int chr = client.read();
+                        if (success[successLocation] == chr) {
+                            successLocation ++;
+                            if (successLocation == strlen(success)) {
+                                initialised = true;
+                                Spark.connect();
+                                Spark.function("digitalread", tinkerDigitalRead);
+                                Spark.function("digitalwrite", tinkerDigitalWrite);
+                                Spark.function("analogread", tinkerAnalogRead);
+                                Spark.function("analogwrite", tinkerAnalogWrite);
+                                break;
+                            }
+                        }
+                        else {
+                            successLocation = 0;
+                        }
+                    }
+                    else {
+                        delay(2);
+                    }
+                }
+            }
+        }
+        else {
+            return;
+        }
+    }
+
     if (Serial.available()) {
         if (connected) {
             int bytes = Serial.available();
