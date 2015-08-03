@@ -8,8 +8,8 @@ bool initialised = false;
 bool connected = false;
 
 const char* breakSequence = "\x1Bstop";
-int breakLocation = 0;
-int breakLength = strlen(breakSequence);
+unsigned int breakLocation = 0;
+unsigned int breakLength = strlen(breakSequence);
 
 int readSerial() {
     int chr = Serial.read();
@@ -26,21 +26,25 @@ int readSerial() {
     return chr;
 }
 
-const char* readWord() {
-    String accumulated = "";
+char* readWord() {
+    const unsigned int BUFLEN = 255;
+    char* accumulated = (char*) malloc(BUFLEN);
+    unsigned int location = 0;
     while (true) {
         if (Serial.available()) {
             char incoming = readSerial();
             if (incoming == '\n' || incoming == ' ') {
                 break;
             }
-            accumulated += incoming;
+            accumulated[location] = incoming;
+            location ++;
         }
         else {
             delay(2); // arbitrary
         }
     }
-    return accumulated.c_str();
+    accumulated[location] = '\0';
+    return accumulated;
 }
 
 void connect(String host, int port) {
@@ -53,7 +57,8 @@ void connect(String host, int port) {
         connected = true;
     }
     else {
-        Serial.println("Failure! " + host);
+        Serial.print("Failure! " + host + " ");
+        Serial.println(port);
     }
 }
 
@@ -72,7 +77,7 @@ void loop () {
                 client.println("Host: www.apple.com");
                 client.println();
                 const char *success = "Success";
-                int successLocation = 0;
+                unsigned int successLocation = 0;
                 while (true) {
                     if (client.available()) {
                         int chr = client.read();
@@ -85,6 +90,7 @@ void loop () {
                                 Spark.function("digitalwrite", tinkerDigitalWrite);
                                 Spark.function("analogread", tinkerAnalogRead);
                                 Spark.function("analogwrite", tinkerAnalogWrite);
+                                client.stop();
                                 break;
                             }
                         }
@@ -112,7 +118,8 @@ void loop () {
         }
         else {
             int cmd = readSerial();
-            String host, stringPort;
+            char* host;
+            char* stringPort;
             switch (cmd) {
                 case 'i':
                     Serial.println("Ready");
@@ -121,7 +128,9 @@ void loop () {
                     readWord(); // junk space
                     host = readWord();
                     stringPort = readWord();
-                    connect(host, stringPort.toInt());
+                    connect(host, atol(stringPort));
+                    free(host);
+                    free(stringPort);
                     break;
                 default:
                     Serial.print("Don't know command: ");

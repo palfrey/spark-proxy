@@ -27,13 +27,16 @@
 import socket, thread, select, serial, sys, time
 
 __version__ = '0.1'
-BUFLEN = 8192
+BUFLEN = 100
 VERSION = 'Spark Proxy/'+__version__
 HTTPVER = 'HTTP/1.1'
 
 class ExtendedSerialPort(serial.Serial):
     def recv(self, *args):
         return self.read(*args)
+
+    def send(self, *args):
+        return self.write(*args)
 
 class ConnectionHandler:
     def __init__(self, connection, address, timeout, ser):
@@ -42,13 +45,15 @@ class ConnectionHandler:
         self.client_buffer = ''
         self.timeout = timeout
         self.method, self.path, self.protocol = self.get_base_header()
-        if self.method=='CONNECT':
-            self.method_CONNECT()
-        elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
-                             'DELETE', 'TRACE'):
-            self.method_others()
-        self.client.close()
-        #self.target.close()
+        try:
+            if self.method=='CONNECT':
+                self.method_CONNECT()
+            elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
+                                 'DELETE', 'TRACE'):
+                self.method_others()
+        finally:
+            self.client.close()
+            #self.target.close()
 
     def get_base_header(self):
         while 1:
@@ -86,10 +91,11 @@ class ConnectionHandler:
             host = host[:i]
         else:
             port = 80
-        self.ser.write("c %s %d\n"% (host, port))
+        self.ser.write("c %s %s \n"% (host, port))
         response = self.ser.readline().strip()
         if response != "Connected to '%s' and '%s'"%(host, port):
             print "Tried to connect to %s %s"%(host,port)
+            do_break(self.ser)
             raise Exception, response
 
     def _read_write(self):
@@ -117,7 +123,7 @@ class ConnectionHandler:
 def do_break(ser):
     ser.write("\x1Bstop")
     time.sleep(0.3) # let the Spark catchup
-    ser.read(1000) # skip all the errors from the break command
+    print ser.read(1000) # skip all the errors from the break command
 
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
                   handler=ConnectionHandler, serial_port = '/dev/ttyS1'):
@@ -141,7 +147,7 @@ def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
         try:
             handler(*args)
         except Exception, e:
-            print "Exception", e
+            print "Exception '%s'" % e
             do_break(ser)
 
 if __name__ == '__main__':
