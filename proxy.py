@@ -24,7 +24,7 @@
 #FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 #OTHER DEALINGS IN THE SOFTWARE.
 
-import socket, thread, select, serial, sys, time
+import socket, thread, select, serial, sys, time, re
 
 __version__ = '0.1'
 BUFLEN = 100
@@ -38,10 +38,35 @@ class ExtendedSerialPort(serial.Serial):
     def send(self, *args):
         return self.write(*args)
 
+class BufferedSocket:
+    def __init__(self, socket):
+        self.socket = socket
+        self.buffer = ''
+
+    def push_back(self, buffer):
+        self.buffer += buffer
+
+    def recv(self, buflen):
+        if self.buffer != '':
+            ret = self.buffer[:buflen]
+            self.buffer = self.buffer[buflen:]
+            return ret
+        else:
+            return self.socket.recv(buflen)
+
+    def send(self, *args):
+        return self.socket.send(*args)
+
+    def close(self, *args):
+        return self.socket.close(*args)
+
+    def fileno(self):
+        return self.socket.fileno()
+
 class ConnectionHandler:
     def __init__(self, connection, address, timeout, ser):
         self.ser = ser
-        self.client = connection
+        self.client = BufferedSocket(connection)
         self.client_buffer = ''
         self.timeout = timeout
         self.method, self.path, self.protocol = self.get_base_header()
@@ -79,8 +104,8 @@ class ConnectionHandler:
         host = self.path[:i]
         path = self.path[i:]
         self._connect_target(host)
-        self.ser.write('%s %s %s\n'%(self.method, path, self.protocol)+
-                         self.client_buffer)
+        self.ser.write('%s %s %s\n'%(self.method, path, self.protocol))
+        self.client.push_back(self.client_buffer)
         self.client_buffer = ''
         self._read_write()
 
@@ -102,6 +127,10 @@ class ConnectionHandler:
         time_out_max = self.timeout/3
         socs = [self.client, self.ser]
         count = 0
+        gettingHeaders = True
+        headerData = ''
+        endOfHeaders = re.compile("(?:\n\r|\n){2}")
+        headerParse = re.compile("([^:]+): (.+)")
         while 1:
             count += 1
             (recv, _, error) = select.select(socs, [], socs, 3)
@@ -112,6 +141,17 @@ class ConnectionHandler:
                     data = in_.recv(BUFLEN)
                     if in_ is self.client:
                         out = self.ser
+                        if gettingHeaders:
+                            headerData += data
+                            if endOfHeaders.search(headerData)!=None:
+                                lines = headerData.splitlines()
+                                headers = dict([headerParse.match(x).groups() for x in lines if x!=''])
+                                headers["Proxy-Connection"] = "close"
+                                headerData = "\n".join(["%s: %s"%v for v in headers.items()])
+                                data = headerData + "\n\n"
+                                gettingHeaders = False
+                            else:
+                                continue
                     else:
                         out = self.client
                     if data:
