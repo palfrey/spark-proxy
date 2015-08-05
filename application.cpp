@@ -10,6 +10,7 @@ bool connected = false;
 const char* breakSequence = "\x1Bstop";
 unsigned int breakLocation = 0;
 unsigned int breakLength = strlen(breakSequence);
+unsigned long lastCheck = 0;
 
 int readSerial() {
     int chr = Serial.read();
@@ -69,7 +70,7 @@ void setup() {
 }
 
 void loop () {
-    if (!initialised) {
+    if (!initialised && !connected && (lastCheck + 5000 < millis())) {
         if (WiFi.ready()) {
             connect("www.apple.com", 80);
             if (connected) {
