@@ -119,13 +119,13 @@ void loop () {
         }
         else {
             int cmd = readSerial();
-            char* host;
-            char* stringPort;
             switch (cmd) {
                 case 'i':
                     Serial.println("Ready");
                     break;
-                case 'c':
+                case 'c': {
+                    char* host;
+                    char* stringPort;
                     readWord(); // junk space
                     host = readWord();
                     stringPort = readWord();
@@ -133,6 +133,21 @@ void loop () {
                     free(host);
                     free(stringPort);
                     break;
+                }
+                case 'w': {
+                    char* ssid;
+                    char* password;
+                    readWord();
+                    ssid = readWord();
+                    password = readWord();
+                    Serial.print("Wifi credentials set to SSID '");
+                    Serial.print(ssid);
+                    Serial.print("' and password '");
+                    Serial.print(password);
+                    Serial.println("'");
+                    WiFi.setCredentials(ssid, password);
+                    break;
+                }
                 default:
                     Serial.print("Don't know command: ");
                     Serial.write(cmd);
