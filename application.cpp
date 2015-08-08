@@ -34,7 +34,7 @@ char* readWord() {
     while (true) {
         if (Serial.available()) {
             char incoming = readSerial();
-            if (incoming == '\n' || incoming == ' ') {
+            if (incoming == '\n' || incoming == ';') {
                 break;
             }
             accumulated[location] = incoming;

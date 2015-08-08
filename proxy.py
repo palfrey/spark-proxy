@@ -116,7 +116,7 @@ class ConnectionHandler:
             host = host[:i]
         else:
             port = 80
-        self.ser.write("c %s %s \n"% (host, port))
+        self.ser.write("c;%s;%s\n"% (host, port))
         response = self.ser.readline().strip()
         if response != "Connected to '%s' and '%s'"%(host, port):
             print "Tried to connect to %s %s"%(host,port)
