@@ -1,6 +1,8 @@
 # -*- coding: cp1252 -*-
 # <PythonProxy.py>
 #
+# Downloaded from https://python-proxy.googlecode.com/svn/trunk/PythonProxy.py, but then further modified
+#
 #Copyright (c) <2009> <Fábio Domingues - fnds3000 in gmail.com>
 #
 #Permission is hereby granted, free of charge, to any person
